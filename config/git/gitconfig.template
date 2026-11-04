@@ -1,0 +1,11 @@
+# kickoff – globale Git-Einstellungen. Wird Key für Key in ~/.gitconfig gemerged, nie ersetzt.
+# Plattformabhängige Keys (core.autocrlf, credential.helper) setzt steps/30-git.* selbst.
+[user]
+	name = {{NAME}}
+	email = {{EMAIL}}
+[init]
+	defaultBranch = main
+[pull]
+	rebase = false
+[core]
+	editor = code --wait

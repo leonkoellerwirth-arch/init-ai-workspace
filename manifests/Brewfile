@@ -1,0 +1,8 @@
+# kickoff – macOS-Pakete (brew bundle). Toolchain-Versionen stehen in mise.toml.
+# "# app: …" markiert Casks, deren App auch ohne brew installiert sein kann – dann wird der Cask übersprungen.
+# In CI wird Docker Desktop per HOMEBREW_BUNDLE_CASK_SKIP=docker-desktop ausgelassen.
+brew "git"
+brew "gh"
+brew "mise"
+cask "visual-studio-code" # app: Visual Studio Code.app
+cask "docker-desktop" # app: Docker.app

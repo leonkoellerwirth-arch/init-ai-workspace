@@ -1,0 +1,3 @@
+# kickoff – Toolchain, plattformübergreifend. Node: aktuelle LTS, auf Major gepinnt.
+[tools]
+node = "26"

@@ -1,0 +1,10 @@
+# kickoff – VS-Code-Extensions, eine ID pro Zeile. Optional zweite Spalte: Plattform (macos|windows).
+anthropic.claude-code
+openai.chatgpt
+ms-azuretools.vscode-docker
+ms-vscode-remote.remote-containers
+eamodio.gitlens
+editorconfig.editorconfig
+esbenp.prettier-vscode
+dbaeumer.vscode-eslint
+ms-vscode-remote.remote-wsl windows

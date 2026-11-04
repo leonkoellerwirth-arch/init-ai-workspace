@@ -26,6 +26,7 @@ KICKOFF_DRY_RUN="${KICKOFF_DRY_RUN:-0}"
 KICKOFF_NON_INTERACTIVE="${KICKOFF_NON_INTERACTIVE:-0}"
 KICKOFF_STEP="${KICKOFF_STEP:-bootstrap}"
 KICKOFF_FAILED_CMD=""
+KICKOFF_DRY_BACKUPS=""
 export KICKOFF_HOME KICKOFF_TS KICKOFF_LOG KICKOFF_DRY_RUN KICKOFF_NON_INTERACTIVE
 
 # Für die Zeitmessung (parallele Listen, weil Bash 3.2 keine assoziativen Arrays kennt).
@@ -42,8 +43,12 @@ kickoff_init_dirs() {
 # Logging
 # ---------------------------------------------------------------------------
 # Maskiert Tokens, Keys und Passwörter, bevor irgendetwas geloggt oder ausgegeben wird.
+# E-Mail-Adressen werden ebenfalls maskiert (Spec §11); git@github.com bleibt lesbar.
 mask_secrets() {
-  sed -E \
+  LC_ALL=C sed -E \
+    -e 's/git@github\.com/__KICKOFF_GH__/g' \
+    -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/***@***/g' \
+    -e 's/__KICKOFF_GH__/git@github.com/g' \
     -e 's/(gh[pousr]_)[A-Za-z0-9_]{10,}/\1***/g' \
     -e 's/(github_pat_)[A-Za-z0-9_]{10,}/\1***/g' \
     -e 's/(sk-ant-)[A-Za-z0-9_-]{6,}/\1***/g' \
@@ -75,7 +80,10 @@ die() {
 }
 
 # Vom ERR-Trap in bootstrap.sh aufgerufen.
+# In Subshells ($(…), Pipes) ignorieren: dort ist ein Fehler oft gewollt abgefangen (`x="$(…)" || …`),
+# und echte Fehler kommen als Exit-Code in der Haupt-Shell an und lösen den Trap dort aus.
 on_error() {
+  [ "$BASH_SUBSHELL" -eq 0 ] || return 0
   local code="$1" cmd="${KICKOFF_FAILED_CMD:-$2}" line="$3"
   _log_file "FAIL  exit=$code line=$line cmd=$cmd"
   _say "✘ [$KICKOFF_STEP] Befehl fehlgeschlagen (Exit $code): $cmd" >&2
@@ -169,6 +177,8 @@ backup_file() {
   esac
   dest="$KICKOFF_BACKUP_DIR/$rel"
   if is_dry_run; then
+    case "$KICKOFF_DRY_BACKUPS" in *"|$src|"*) return 0 ;; esac
+    KICKOFF_DRY_BACKUPS="$KICKOFF_DRY_BACKUPS|$src|"
     _say "  [dry-run] Backup $src → $dest"
     return 0
   fi
@@ -222,3 +232,76 @@ print_timing() {
   printf '  %-20s %4ss\n' "gesamt" "$total"
   _log_file "TOTAL ${total}s"
 }
+
+# ---------------------------------------------------------------------------
+# Umgebung, Profile, JSON
+# ---------------------------------------------------------------------------
+# Macht brew und mise-Shims im laufenden Prozess verfügbar (auch vor dem ersten Shell-Neustart).
+load_env_paths() {
+  local b
+  for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+    if [ -x "$b" ] && ! has_cmd brew; then eval "$("$b" shellenv)"; fi
+  done
+  if has_cmd mise; then
+    case ":$PATH:" in
+      *":${MISE_DATA_DIR:-$HOME/.local/share/mise}/shims:"*) ;;
+      *) export PATH="${MISE_DATA_DIR:-$HOME/.local/share/mise}/shims:$PATH" ;;
+    esac
+  fi
+  return 0
+}
+
+# ensure_block <Datei> <Name> <Inhalt> – verwalteter Block zwischen Markern; Rest der Datei bleibt.
+ensure_block() {
+  local file="$1" name="$2" content="$3"
+  local begin="# >>> kickoff:$name >>>" end="# <<< kickoff:$name <<<"
+  local wanted current=""
+  wanted="$(printf '%s\n%s\n%s' "$begin" "$content" "$end")"
+  if [ -f "$file" ]; then
+    current="$(awk -v b="$begin" -v e="$end" '$0==b{f=1} f{print} $0==e{f=0}' "$file")"
+  fi
+  if [ "$current" = "$wanted" ]; then
+    ok "$(basename "$file"): Block $name bereits vorhanden"
+    return 0
+  fi
+  doing "$(basename "$file"): Block $name wird eingetragen"
+  backup_file "$file"
+  run _ensure_block_write "$file" "$begin" "$end" "$wanted"
+}
+
+_ensure_block_write() {
+  local file="$1" begin="$2" end="$3" wanted="$4" tmp
+  tmp="$(mktemp)"
+  if [ -f "$file" ]; then
+    awk -v b="$begin" -v e="$end" '$0==b{f=1; next} $0==e{f=0; next} !f{print}' "$file" >"$tmp"
+  fi
+  printf '\n%s\n' "$wanted" >>"$tmp"
+  mkdir -p "$(dirname "$file")"
+  cat "$tmp" >"$file"
+  rm -f "$tmp"
+}
+
+# JSON-Merge per node (identisch in lib/common.ps1): fehlende Keys aus <defaults> in <target>
+# ergänzen, bestehende Keys gewinnen. Exit 0 = nichts zu tun, 10 = geändert (bzw. würde ändern),
+# 20 = Ziel ist kein reines JSON (z. B. Kommentare) – dann nichts anfassen.
+KICKOFF_JSON_MERGE_JS='
+const fs = require("fs");
+const [target, defaults, mode] = process.argv.slice(1);
+const want = JSON.parse(fs.readFileSync(defaults, "utf8"));
+let have = {};
+if (fs.existsSync(target)) {
+  const raw = fs.readFileSync(target, "utf8").replace(/^\uFEFF/, "");
+  if (raw.trim() !== "") {
+    try { have = JSON.parse(raw); } catch (e) { process.exit(20); }
+  }
+}
+const missing = Object.keys(want).filter(k => !(k in have));
+if (missing.length === 0) process.exit(0);
+if (mode === "write") {
+  for (const k of missing) have[k] = want[k];
+  fs.writeFileSync(target, JSON.stringify(have, null, 2) + "\n");
+}
+console.log(missing.join(", "));
+process.exit(10);
+'
+json_merge() { node -e "$KICKOFF_JSON_MERGE_JS" "$@"; }
