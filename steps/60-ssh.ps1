@@ -58,8 +58,11 @@ Host *
 
     $fp = ''
     if (Test-Path "$key.pub") { $fp = ((Invoke-KProbe ssh-keygen -lf "$key.pub").Output -split '\s+')[1] }
-    $agentKeys = (Invoke-KProbe ssh-add -l).Output
-    if ($fp -and $agentKeys.Contains($fp)) {
+    $agent = Invoke-KProbe ssh-add -l
+    if ($agent.ExitCode -eq 2) {
+        # Exit 2 = kein Agent erreichbar. Kein Fehler: AddKeysToAgent lädt den Key beim ersten Gebrauch.
+        Write-KInfo 'Kein ssh-agent in dieser Sitzung – der Key wird beim ersten Gebrauch automatisch geladen (AddKeysToAgent).'
+    } elseif ($fp -and $agent.Output.Contains($fp)) {
         Write-KOk 'SSH-Key bereits im Agent'
     } else {
         Write-KDoing 'SSH-Key wird dem Agent hinzugefügt'

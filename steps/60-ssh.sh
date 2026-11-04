@@ -49,10 +49,14 @@ step_60_ssh() {
   IdentityFile ~/.ssh/id_ed25519
 Host *'
 
-  local fp="" agent_keys
+  local fp="" agent_keys agent_rc=0
   if [ -f "$KICKOFF_SSH_KEY.pub" ]; then fp="$(ssh-keygen -lf "$KICKOFF_SSH_KEY.pub" | awk '{print $2}')"; fi
-  agent_keys="$(ssh-add -l 2>/dev/null || true)"
-  if [ -n "$fp" ] && case "$agent_keys" in *"$fp"*) true ;; *) false ;; esac; then
+  agent_keys="$(ssh-add -l 2>/dev/null)" || agent_rc=$?
+  if [ "$agent_rc" -eq 2 ]; then
+    # Exit 2 = kein Agent erreichbar (z. B. per SSH angemeldet). Kein Fehler: AddKeysToAgent im
+    # github-Block lädt den Key beim ersten Gebrauch in den Agent und die Keychain.
+    info "Kein ssh-agent in dieser Sitzung – der Key wird beim ersten Gebrauch automatisch geladen (AddKeysToAgent)."
+  elif [ -n "$fp" ] && case "$agent_keys" in *"$fp"*) true ;; *) false ;; esac; then
     ok "SSH-Key bereits im Agent"
   else
     doing "SSH-Key wird dem Agent (Keychain) hinzugefügt"

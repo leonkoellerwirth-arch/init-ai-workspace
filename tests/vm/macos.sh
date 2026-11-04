@@ -43,6 +43,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "➜ Frische VM $VM aus $BASE"
+tart stop "$VM" >/dev/null 2>&1 || true
 tart delete "$VM" >/dev/null 2>&1 || true
 tart clone "$BASE" "$VM"
 tart run "$VM" --no-graphics >"$WORK/tart.log" 2>&1 &
@@ -52,12 +53,18 @@ echo "  IP: $IP"
 # SSH-Zugang: Testkey einmal per Passwort (admin/admin der vanilla-Images) hinterlegen.
 ssh-keygen -q -t ed25519 -N "" -f "$KEY"
 SSH_OPTS=(-i "$KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=10)
+PUB="$(cat "$KEY.pub")"
+# Ohne ssh-copy-id: das hängt unter expect. Feste Zeitgrenze je Versuch, bis sshd in der VM bereit ist.
 for _ in $(seq 1 30); do
   if expect -c "
-      set timeout 20
-      spawn ssh-copy-id -i $KEY.pub -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null admin@$IP
-      expect { \"assword:\" { send \"admin\r\"; exp_continue } eof }
-      catch wait r; exit [lindex \$r 3]" >/dev/null 2>&1; then
+      set timeout 30
+      spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PubkeyAuthentication=no -o ConnectTimeout=10 admin@$IP {mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '$PUB' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && echo KEY_OK}
+      expect {
+        -re {[Pp]assword:} { send \"admin\r\"; exp_continue }
+        KEY_OK { exit 0 }
+        timeout { exit 1 }
+        eof { exit 1 }
+      }" >/dev/null 2>&1; then
     break
   fi
   sleep 5
