@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Lint: shellcheck für alle .sh, PSScriptAnalyzer (Warning/Error + Kompatibilität PS 5.1/7, siehe
 # tests/PSScriptAnalyzerSettings.psd1) für alle .ps1. Exit 1 bei jeder Warnung.
+# scripts/ und .claude/ kommen aus dev/base (base sync) und werden von scripts/gate.sh mit
+# Stufe "warning" geprüft, nicht hier mit Stufe "style".
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -8,7 +10,7 @@ cd "$ROOT"
 rc=0
 
 sh_files=()
-while IFS= read -r f; do [ -f "$f" ] && sh_files+=("$f"); done < <(git ls-files --cached --others --exclude-standard -- '*.sh')
+while IFS= read -r f; do [ -f "$f" ] && sh_files+=("$f"); done < <(git ls-files --cached --others --exclude-standard -- '*.sh' ':(exclude)scripts/*' ':(exclude).claude/*')
 
 if ! command -v shellcheck >/dev/null 2>&1; then
   echo "✘ shellcheck fehlt (brew install shellcheck)" >&2
