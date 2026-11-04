@@ -23,6 +23,8 @@ tests/smoke/smoke.sh                                 # je Schritt ein Dry-Run ge
 docker run --rm -v "$PWD":/w -w /w mcr.microsoft.com/powershell:lts-7.4-ubuntu-22.04 pwsh -File tests/smoke/smoke.ps1
 ```
 
+Ende-zu-Ende auf frischem macOS: `tests/vm/macos.sh [--keep] [--ref <branch>]` (Tart-VM aus Basis `kickoff-base`, echter `curl | bash`-Einstieg, zwei Läufe + doctor, Logs nach `vm-results/`). Testet den gepushten Stand auf GitHub, nicht die lokale Arbeitskopie.
+
 Nach jeder Änderung müssen `tests/lint.sh` und beide Smoke-Suiten sauber sein. Echte Läufe einzelner Schritte nur mit isoliertem `HOME` testen (ssh-agent/Keychain getrennt halten).
 
 ## Architektur
