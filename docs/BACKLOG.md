@@ -14,3 +14,4 @@ Ideen außerhalb der Spec. Nicht bauen, nur notieren.
 - Teilläufe (`--only`/`--skip`) enden nicht mit doctors Exit-Code, sonst wäre jeder Teillauf rot.
 - `lib/json-merge.js` zusätzlich zur Struktur in §3, damit beide Plattformen identisch mergen.
 - Windows: ExecutionPolicy `RemoteSigned` (CurrentUser) und `core.sshCommand` auf Windows-OpenSSH – sonst laden Profil/npm-Shims nicht bzw. sieht Git den ssh-agent nicht.
+- README länger als eine Bildschirmseite (Spec §7): Betreiber wollte ausdrücklich sehen, was auf dem Rechner geändert wird und wozu (2026-11-04).
