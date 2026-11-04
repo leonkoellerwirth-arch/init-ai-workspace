@@ -143,6 +143,8 @@ try {
         Write-KInfo '[dry-run] doctor wird nach einem echten Lauf ausgeführt.'
     } else {
         $doctorRc = Invoke-Doctor
+        # Ein Teillauf (-Only/-Skip) kann nicht komplett grün sein – doctor ist dann nur Information.
+        if ($Only.Count -gt 0 -or $Skip.Count -gt 0) { $doctorRc = 0 }
     }
 
     Write-KTiming ([int]((Get-Date) - $totalStart).TotalSeconds)

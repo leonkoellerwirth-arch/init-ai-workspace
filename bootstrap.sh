@@ -126,6 +126,8 @@ if is_dry_run; then
   info "[dry-run] doctor wird nach einem echten Lauf ausgeführt."
 else
   run_doctor || doctor_rc=$?
+  # Ein Teillauf (--only/--skip) kann nicht komplett grün sein – doctor ist dann nur Information.
+  if [ ${#ONLY[@]} -gt 0 ] || [ ${#SKIP[@]} -gt 0 ]; then doctor_rc=0; fi
 fi
 
 print_timing "$(( $(date +%s) - TOTAL_START ))"
