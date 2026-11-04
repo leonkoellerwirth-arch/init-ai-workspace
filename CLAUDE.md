@@ -18,7 +18,12 @@ tests/lint.sh                                        # shellcheck (*.sh) + PSScr
 pwsh -File bootstrap.ps1 -DryRun -NonInteractive     # Windows-Pendant
 ```
 
-Smoke-Tests liegen in `tests/smoke/` (je Schritt ein Dry-Run-Test, der die geplanten Befehle prüft). Nach jeder Phase muss `tests/lint.sh` sauber sein, bevor es weitergeht.
+```bash
+tests/smoke/smoke.sh                                 # je Schritt ein Dry-Run gegen leeres HOME: geplante Befehle + „nichts verändert"
+docker run --rm -v "$PWD":/w -w /w mcr.microsoft.com/powershell:lts-7.4-ubuntu-22.04 pwsh -File tests/smoke/smoke.ps1
+```
+
+Nach jeder Änderung müssen `tests/lint.sh` und beide Smoke-Suiten sauber sein. Echte Läufe einzelner Schritte nur mit isoliertem `HOME` testen (ssh-agent/Keychain getrennt halten).
 
 ## Architektur
 
