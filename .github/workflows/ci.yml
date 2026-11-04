@@ -48,3 +48,33 @@ jobs:
       - name: Smoke-Tests (Windows PowerShell 5.1)
         shell: powershell
         run: .\tests\smoke\smoke.ps1
+
+  # Echter Teillauf auf Windows (BIBLE: Windows-Testweg A). Schritt 10 (winget configure inkl.
+  # VS Code/Docker Desktop) und 50 (WSL2-Neustart) bleiben draußen; mise kommt daher von der Action.
+  windows-real-run:
+    runs-on: windows-latest
+    env:
+      # Ein leerer Wert löscht unter Windows die Variable – ein Leerzeichen heißt hier "keine npm-Pakete".
+      KICKOFF_NPM_GLOBALS: " "
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+        with:
+          install: false
+      - name: Echter Lauf (Schritte 20, 30, 60; Windows PowerShell 5.1)
+        shell: powershell
+        run: .\bootstrap.ps1 -NonInteractive -Only 20,30,60
+      - name: Zweiter Lauf ändert nichts
+        shell: powershell
+        run: |
+          .\bootstrap.ps1 -NonInteractive -Only 20,30,60
+          # Konsolenausgabe geht an der Pipeline vorbei – geprüft wird das Log des Laufs (DO = geplante Änderung).
+          $log = Get-ChildItem -Path (Join-Path $HOME '.kickoff\logs') -Filter '*.log' | Sort-Object LastWriteTime | Select-Object -Last 1
+          $changes = Select-String -Path $log.FullName -Pattern '] DO ' -SimpleMatch
+          if ($changes) { $changes | ForEach-Object { $_.Line }; throw 'Zweiter Lauf hat Aenderungen geplant' }
+      - name: Keine npm-Pakete installiert
+        shell: powershell
+        run: |
+          npm ls -g --depth=0 @anthropic-ai/claude-code
+          if ($LASTEXITCODE -eq 0) { throw 'claude-code wurde trotz KICKOFF_NPM_GLOBALS installiert' }
+          exit 0

@@ -22,6 +22,7 @@ Auftrag und Detailregeln: `KICKOFF_SPEC.md` (verbindlich), Arbeitsregeln: `CLAUD
 
 Newest first. Each: date · decision · why · (superseded by …). Begründungen: `docs/BACKLOG.md`.
 
+- **2026-11-05 — Windows-Testweg A**: echter Teillauf der Schritte 20/30/60 in CI (`windows-real-run` in `.github/workflows/ci.yml`); 10 und 50 bleiben Dry-Run. Status: aktiv.
 - **2026-11-04 — Repo auf `base` gebracht** (`base sync`, additiv) — Session-Skills, Gate, Guardrails. Status: aktiv.
 - **2026-11-04 — README zeigt, was geändert wird und wozu** (länger als Spec §7) — Betreiber-Wunsch. `README.md`. Status: aktiv.
 - **2026-11-04 — Vorabprüfung vor jedem Schritt** (Versionen/Kompatibilität, Abbruch vor Änderung) — Betreiber-Wunsch. `lib/common.*` (`check_platform`, `Test-KPlatform`). Status: aktiv.
@@ -33,6 +34,6 @@ Newest first. Each: date · decision · why · (superseded by …). Begründunge
 
 _(Blocking questions. Do not start substantive work that depends on an open decision here.)_
 
-- Windows-Ende-zu-Ende-Test: Option A (echter Teillauf in CI) / B (Win11 ARM in UTM) / C (Win11-PC bzw. Cloud-VM) — `docs/STATUS.md`. Nicht blockierend für macOS.
+- Windows-Volllauf (Schritte 10/50, WSL2-Neustart, Docker Desktop): B (Win11 ARM in UTM) / C (Win11-PC bzw. Cloud-VM) — `docs/STATUS.md`. Nicht blockierend.
 - Commit-Trailer `noreply@anthropic.com` vs. Spec §11 „keine E-Mail im Repo" — `docs/STATUS.md`.
 - VS-Code-Default-Settings bestätigen — `config/vscode/settings.json`.
