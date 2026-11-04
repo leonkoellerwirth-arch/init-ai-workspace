@@ -21,7 +21,7 @@ dry() {
     -not -path './.kickoff/logs/*' \
     -not -path './Library/Caches/*' -not -path './.npm/*' -not -path './.cache/*' \
     -not -path './.vscode/*' -not -path './Library/Application Support/Code/*' \
-    -not -path './Library/Application Support/Microsoft/*' 2>/dev/null || true)"
+    -not -path './Library/Application Support/Microsoft/*' -not -path './.local/*' 2>/dev/null || true)"
   rm -rf "$home"
   if [ -n "$changed" ]; then
     echo "✘ Dry-Run ($*) hat Dateien angelegt: $changed"

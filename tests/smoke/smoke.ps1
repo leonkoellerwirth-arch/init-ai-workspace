@@ -35,9 +35,10 @@ function Invoke-SmokeDryRun {
     } finally {
         foreach ($k in $vars.Keys) { [Environment]::SetEnvironmentVariable($k, $saved[$k]) }
     }
-    # Dry-Run darf außer dem Log nichts anlegen.
+    # Dry-Run darf außer dem Log nichts anlegen. Caches, die winget/npm/code beim Lesen selbst
+    # anlegen (z. B. Microsoft\DeveloperTools\deviceid), sind keine Änderung durch kickoff.
     $changed = @(Get-ChildItem -Path $home2 -Recurse -File -Force -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -notmatch '[\\/]\.kickoff[\\/]logs[\\/]' -and $_.FullName -notmatch '[\\/](Cache|cache|npm-cache|\.npm|\.cache)[\\/]' })
+            Where-Object { $_.FullName -notmatch '[\\/]\.kickoff[\\/]logs[\\/]' -and $_.FullName -notmatch '[\\/](Cache|cache|npm-cache|\.npm|\.cache|\.vscode|Code|DeveloperTools|\.docker|\.local)[\\/]' })
     Remove-Item -Path $home2 -Recurse -Force -ErrorAction SilentlyContinue
     if ($changed.Count -gt 0) {
         [Console]::Out.WriteLine("✘ Dry-Run ($($BootstrapArgs -join ' ')) hat Dateien angelegt: $($changed[0].FullName)")
