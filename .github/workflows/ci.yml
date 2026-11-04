@@ -1,0 +1,50 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+env:
+  KICKOFF_GIT_NAME: kickoff CI
+  KICKOFF_GIT_EMAIL: ci@example.invalid
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck + PSScriptAnalyzer
+        run: tests/lint.sh
+
+  macos-dry-run:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dry-Run
+        run: ./bootstrap.sh --dry-run --non-interactive
+      - name: Smoke-Tests
+        run: tests/smoke/smoke.sh
+      # Echte Installationen in CI nur für git, gh, mise, node (Spec §8) – ohne Casks und npm-Pakete.
+      - name: Echte Installation (git, gh, mise, node)
+        env:
+          HOMEBREW_BUNDLE_CASK_SKIP: visual-studio-code docker-desktop
+          KICKOFF_NPM_GLOBALS: ""
+        run: ./bootstrap.sh --non-interactive --only 10 --only 20
+      - name: Zweiter Lauf ändert nichts
+        env:
+          HOMEBREW_BUNDLE_CASK_SKIP: visual-studio-code docker-desktop
+          KICKOFF_NPM_GLOBALS: ""
+        run: |
+          ./bootstrap.sh --non-interactive --only 10 --only 20 | tee second-run.log
+          if grep -q '➜' second-run.log; then echo "Zweiter Lauf hat Änderungen geplant"; exit 1; fi
+
+  windows-dry-run:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dry-Run (Windows PowerShell 5.1)
+        shell: powershell
+        run: .\bootstrap.ps1 -DryRun -NonInteractive
+      - name: Smoke-Tests (Windows PowerShell 5.1)
+        shell: powershell
+        run: .\tests\smoke\smoke.ps1
