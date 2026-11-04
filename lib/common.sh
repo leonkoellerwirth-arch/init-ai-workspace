@@ -289,3 +289,41 @@ _ensure_block_write() {
 # JSON-Merge (lib/json-merge.js, identisch für Windows): Exit 0 = nichts zu tun, 10 = Keys fehlen
 # (bzw. wurden ergänzt), 20 = Ziel ist kein reines JSON.
 json_merge() { node "$KICKOFF_ROOT/lib/json-merge.js" "$@"; }
+
+# ---------------------------------------------------------------------------
+# Vorabprüfung: Versionen und Kompatibilität, bevor irgendein Schritt läuft
+# ---------------------------------------------------------------------------
+# _check <name> <ist> <ok:0|1> [Hinweis] – eine Zeile ✔/✘ mit genau einem Hinweis.
+_check() {
+  if [ "$3" = "1" ]; then
+    printf '✔ %-22s %s\n' "$1" "$2"
+    _log_file "CHECK ok   $1 = $2"
+    return 0
+  fi
+  printf '✘ %-22s %s\n' "$1" "$2" >&2
+  [ -n "${4:-}" ] && printf '  → %s\n' "$4" >&2
+  _log_file "CHECK fail $1 = $2 | ${4:-}"
+  return 1
+}
+
+check_platform() {
+  local rc=0 ok arch translated macos
+
+  macos="$(sw_vers -productVersion 2>/dev/null || echo unbekannt)"
+  _check "macOS" "$macos" 1
+
+  ok=0; [ "${BASH_VERSINFO[0]}" -gt 3 ] || { [ "${BASH_VERSINFO[0]}" -eq 3 ] && [ "${BASH_VERSINFO[1]}" -ge 2 ]; } && ok=1
+  _check "bash" "$BASH_VERSION" "$ok" "bash ≥ 3.2 nötig – /bin/bash verwenden: curl … | /bin/bash" || rc=1
+
+  # Unter Rosetta landet Homebrew in /usr/local (Intel) statt /opt/homebrew – später schwer zu entwirren.
+  arch="$(uname -m)"
+  translated="$(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)"
+  ok=1; [ "$translated" = "1" ] && ok=0
+  _check "Architektur" "$arch$( [ "$translated" = "1" ] && echo ' (Rosetta)')" "$ok" \
+    'Terminal läuft unter Rosetta: im Finder Terminal → Informationen → "Mit Rosetta öffnen" abwählen, neu starten.' || rc=1
+
+  ok=0; has_cmd curl && ok=1
+  _check "curl" "$(has_cmd curl && echo vorhanden || echo fehlt)" "$ok" "curl gehört zu macOS – System prüfen (xcode-select --install)." || rc=1
+
+  return "$rc"
+}

@@ -116,6 +116,8 @@ Assert-SmokeMatch '90: non-interactive überspringt Logins' 'Logins übersprunge
 Invoke-SmokeDryRun @()
 Assert-SmokeExitCode 'voller Dry-Run: Exit 0' 0
 Assert-SmokeMatch 'voller Dry-Run: Zeitmessung' 'gesamt +\d+s'
+Assert-SmokeMatch 'Vorabprüfung: PowerShell-Version' '✔ PowerShell +\d+\.\d+'
+Assert-SmokeMatch 'Vorabprüfung: Language Mode' 'Language Mode +FullLanguage'
 Invoke-SmokeDryRun @('-Only', '30', '-Skip', '30')
 Assert-SmokeNoMatch '-Skip schlägt -Only' '── 30-git'
 

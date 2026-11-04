@@ -345,7 +345,8 @@ function Invoke-KJsonMerge {
     $previous = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        $out = & node $script $Target $Defaults $Mode 2>&1 | ForEach-Object { "$_" }
+        $node = 'node'  # externes Programm; als Variable, damit die Kompatibilitätsregel es nicht als Cmdlet prüft
+        $out = & $node $script $Target $Defaults $Mode 2>&1 | ForEach-Object { "$_" }
         $rc = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $previous
@@ -398,6 +399,71 @@ function Invoke-KElevated {
         Write-KLogFile "EXIT  $($p.ExitCode)"
         throw (New-Object KickoffCommandException($q, $p.ExitCode))
     }
+}
+
+# ---------------------------------------------------------------------------
+# Vorabprüfung: Versionen und Kompatibilität, bevor irgendein Schritt läuft
+# ---------------------------------------------------------------------------
+# Jede Zeile: ✔ oder ✘ mit genau einem Hinweis. Harte Fehler brechen ab (außer im Dry-Run
+# auf Nicht-Windows-Systemen, damit CI/Container den Ablauf testen können).
+function Write-KCheck {
+    param([string]$Name, [string]$Have, [bool]$Ok, [string]$Fix = '', [switch]$Soft)
+    if ($Ok) {
+        Write-KConsole ('✔ {0,-22} {1}' -f $Name, $Have)
+        Write-KLogFile "CHECK ok   $Name = $Have"
+        return $true
+    }
+    $mark = '✘'
+    if ($Soft) { $mark = '⚠' }
+    Write-KConsole ('{0} {1,-22} {2}' -f $mark, $Name, $Have) -ToError
+    if ($Fix) { Write-KConsole "  → $Fix" -ToError }
+    Write-KLogFile "CHECK fail $Name = $Have | $Fix"
+    return [bool]$Soft
+}
+
+function Test-KPlatform {
+    $allOk = $true
+    $isWin = ($env:OS -eq 'Windows_NT')
+    $v = $PSVersionTable.PSVersion
+    $edition = 'Desktop'
+    if ($PSVersionTable.ContainsKey('PSEdition')) { $edition = $PSVersionTable.PSEdition }
+
+    # PowerShell: Windows PowerShell 5.1 ist die Baseline; PowerShell 7 erst ab 7.2 (ältere sind ohne Support).
+    $psOk = ($edition -eq 'Desktop' -and $v -ge [version]'5.1') -or ($edition -eq 'Core' -and $v -ge [version]'7.2')
+    $allOk = (Write-KCheck 'PowerShell' "$v ($edition)" $psOk 'Windows PowerShell 5.1 verwenden: im Startmenü "Windows PowerShell" öffnen (powershell.exe) oder PowerShell 7 aktualisieren: winget upgrade --id Microsoft.PowerShell') -and $allOk
+
+    $mode = $ExecutionContext.SessionState.LanguageMode
+    $allOk = (Write-KCheck 'Language Mode' "$mode" ("$mode" -eq 'FullLanguage') 'Eine Richtlinie (AppLocker/WDAC) erzwingt eingeschränktes PowerShell – die IT muss das Skript freigeben.') -and $allOk
+
+    $allOk = (Write-KCheck '64-Bit-Prozess' ([Environment]::Is64BitProcess) ([Environment]::Is64BitProcess) '32-Bit-PowerShell erkannt – die normale (64-Bit-)PowerShell aus dem Startmenü öffnen, nicht "(x86)".') -and $allOk
+
+    if (-not $isWin) {
+        Write-KInfo 'Kein Windows – Windows-spezifische Prüfungen entfallen (nur Dry-Run erlaubt).'
+        return $allOk
+    }
+
+    $build = [Environment]::OSVersion.Version.Build
+    $allOk = (Write-KCheck 'Windows-Build' "$build" ($build -ge 22000) 'kickoff v1 braucht Windows 11 (Build 22000 oder neuer): Einstellungen → Windows Update.') -and $allOk
+
+    $wingetVersion = ''
+    $probe = Invoke-KProbe winget --version
+    if ($probe.ExitCode -eq 0 -and $probe.Output -match '(\d+\.\d+\.\d+)') { $wingetVersion = $Matches[1] }
+    $wingetOk = $wingetVersion -and ([version]$wingetVersion -ge [version]'1.6.2631')
+    $have = $wingetVersion
+    if (-not $have) { $have = 'fehlt' }
+    $allOk = (Write-KCheck 'winget' $have $wingetOk 'winget configure braucht WinGet ≥ 1.6.2631: Microsoft Store → "App Installer" aktualisieren (ms-windows-store://pdp/?productid=9NBLGGH4NNS1).') -and $allOk
+
+    # Per Gruppenrichtlinie erzwungene Policies lassen sich nicht per CurrentUser überschreiben.
+    $forced = ''
+    foreach ($scope in @('MachinePolicy', 'UserPolicy')) {
+        $p = Get-ExecutionPolicy -Scope $scope
+        if (@('Restricted', 'AllSigned') -contains "$p") { $forced = "$scope=$p" }
+    }
+    $forcedHave = 'keine Richtlinie'
+    if ($forced) { $forcedHave = $forced }
+    [void](Write-KCheck 'ExecutionPolicy (GPO)' $forcedHave (-not $forced) 'Gruppenrichtlinie blockiert Skripte: Profil-Hook und npm-Shims (claude.ps1) laden nicht. claude.cmd / codex.cmd funktionieren trotzdem; dauerhaft nur über die IT lösbar.' -Soft)
+
+    return $allOk
 }
 
 # KickoffCommandException: Fehler eines über Invoke-KRun gestarteten Befehls (Befehl + Exit-Code).

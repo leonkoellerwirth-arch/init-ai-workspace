@@ -24,6 +24,14 @@ param(
     [switch]$Doctor
 )
 
+# Frühe Versionsprüfung mit Syntax, die auch uralte PowerShell-Versionen noch verstehen,
+# damit dort eine klare Meldung statt eines Parserfehlers erscheint.
+if ($PSVersionTable.PSVersion.Major -lt 5 -or ($PSVersionTable.PSVersion.Major -eq 5 -and $PSVersionTable.PSVersion.Minor -lt 1)) {
+    [Console]::Error.WriteLine("✘ kickoff braucht mindestens Windows PowerShell 5.1 (gefunden: $($PSVersionTable.PSVersion)).")
+    [Console]::Error.WriteLine('  → Windows 11 enthält sie: im Startmenü "Windows PowerShell" öffnen und den Befehl dort erneut ausführen.')
+    return
+}
+
 $KickoffRepo = 'leonkoellerwirth-arch/init-ai-workspace'
 if ($env:KICKOFF_REPO) { $KickoffRepo = $env:KICKOFF_REPO }
 $KickoffRef = 'main'
@@ -120,6 +128,14 @@ try {
 
     Write-KInfo "kickoff – Log: $($env:KICKOFF_LOG)"
     if (Test-KDryRun) { Write-KInfo 'Dry-Run: es wird nichts verändert.' }
+
+    Write-KConsole ''
+    Write-KConsole '── Vorabprüfung'
+    if (-not (Test-KPlatform)) {
+        if ($env:OS -eq 'Windows_NT' -or -not (Test-KDryRun)) {
+            Write-KFail 'Die Vorabprüfung ist fehlgeschlagen – es wurde nichts verändert.' 'Die Hinweise oben (→) befolgen und denselben Befehl erneut starten.'
+        }
+    }
 
     $totalStart = Get-Date
     $stepDir = Join-Path $KickoffRoot 'steps'

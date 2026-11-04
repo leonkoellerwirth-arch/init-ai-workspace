@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Lint: shellcheck für alle .sh, PSScriptAnalyzer (Severity Warning) für alle .ps1. Exit 1 bei jeder Warnung.
+# Lint: shellcheck für alle .sh, PSScriptAnalyzer (Warning/Error + Kompatibilität PS 5.1/7, siehe
+# tests/PSScriptAnalyzerSettings.psd1) für alle .ps1. Exit 1 bei jeder Warnung.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -27,7 +28,8 @@ PSSA='
     Install-Module PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck | Out-Null
   }
   $files = $env:KICKOFF_PS_FILES -split "`n" | Where-Object { $_ }
-  $results = $files | ForEach-Object { Invoke-ScriptAnalyzer -Path $_ -Severity Warning,Error }
+  $settings = Join-Path (Get-Location) "tests/PSScriptAnalyzerSettings.psd1"
+  $results = $files | ForEach-Object { Invoke-ScriptAnalyzer -Path $_ -Settings $settings }
   if ($results) { $results | Format-Table -AutoSize | Out-String -Width 200 | Write-Output; exit 1 }
 '
 KICKOFF_PS_FILES="$(printf '%s\n' ${ps_files[@]+"${ps_files[@]}"})"

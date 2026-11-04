@@ -35,8 +35,15 @@ function Get-DoctorVersion {
 
 Write-KConsole ('{0,-17} {1,-11} {2,-12} {3}' -f 'Komponente', 'Soll', 'Ist', 'Status')
 
+$psv = $PSVersionTable.PSVersion
+$shellEdition = 'Desktop'
+if ($PSVersionTable.ContainsKey('PSEdition')) { $shellEdition = $PSVersionTable.PSEdition }
+$psOk = ($shellEdition -eq 'Desktop' -and $psv -ge [version]'5.1') -or ($shellEdition -eq 'Core' -and $psv -ge [version]'7.2')
+Write-DoctorRow 'PowerShell' '5.1/≥7.2' "$($psv.Major).$($psv.Minor)" $psOk 'powershell.exe (Windows PowerShell 5.1) verwenden'
+
 $v = Get-DoctorVersion 'winget'
-Write-DoctorRow 'winget' 'vorhanden' $v ([bool]$v) 'Im Microsoft Store "App Installer" aktualisieren'
+$wingetOk = $v -and ([version]$v -ge [version]'1.6.2631')
+Write-DoctorRow 'winget' '≥ 1.6.2631' $v $wingetOk 'Microsoft Store → "App Installer" aktualisieren'
 
 $v = Get-DoctorVersion 'git'
 $gitOk = $false

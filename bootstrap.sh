@@ -103,6 +103,9 @@ fi
 info "kickoff – Log: $KICKOFF_LOG"
 is_dry_run && info "Dry-Run: es wird nichts verändert."
 
+printf '\n── Vorabprüfung\n'
+check_platform || die "Die Vorabprüfung ist fehlgeschlagen – es wurde nichts verändert." "Die Hinweise oben (→) befolgen und denselben Befehl erneut starten."
+
 TOTAL_START="$(date +%s)"
 found=0
 for step_file in "$KICKOFF_ROOT"/steps/[0-9][0-9]-*.sh; do

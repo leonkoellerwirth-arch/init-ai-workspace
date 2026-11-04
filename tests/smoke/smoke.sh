@@ -108,6 +108,9 @@ test_flags() {
   dry
   expect_rc "voller Dry-Run: Exit 0" 0
   expect "voller Dry-Run: Zeitmessung" 'gesamt +[0-9]+s'
+  expect "Vorabprüfung: bash" '✔ bash +3\.2|✔ bash +[4-9]'
+  expect "Vorabprüfung: Architektur" '✔ Architektur'
+
   dry --only 30 --skip 30
   expect_not "--skip schlägt --only" '── 30-git'
   dry --gibt-es-nicht
