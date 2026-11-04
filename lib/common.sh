@@ -279,7 +279,8 @@ _ensure_block_write() {
   if [ -f "$file" ]; then
     awk -v b="$begin" -v e="$end" '$0==b{f=1; next} $0==e{f=0; next} !f{print}' "$file" >"$tmp"
   fi
-  printf '\n%s\n' "$wanted" >>"$tmp"
+  if [ -s "$tmp" ]; then printf '\n' >>"$tmp"; fi
+  printf '%s\n' "$wanted" >>"$tmp"
   mkdir -p "$(dirname "$file")"
   cat "$tmp" >"$file"
   rm -f "$tmp"

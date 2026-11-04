@@ -330,7 +330,9 @@ function Sync-KBlock {
     }
     $dir = Split-Path $Path -Parent
     if (-not (Test-Path $dir)) { [void](New-Item -ItemType Directory -Path $dir -Force) }
-    $text = (@($outside) + @('') + $wanted) -join "`r`n"
+    $head = @($outside)
+    if ($head.Count -gt 0) { $head += '' }
+    $text = ($head + $wanted) -join "`r`n"
     # Standard: UTF-8 mit BOM, damit Windows PowerShell 5.1 Profile korrekt liest. -NoBom z. B. für ~/.ssh/config.
     [IO.File]::WriteAllText($Path, $text + "`r`n", (New-Object System.Text.UTF8Encoding(-not $NoBom)))
     Write-KLogFile "BLOCK $Name → $Path"
