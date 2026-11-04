@@ -40,6 +40,7 @@ Nach jeder Änderung müssen `tests/lint.sh` und beide Smoke-Suiten sauber sein.
 - Bash-Helfer und PS-Helfer sind 1:1 gespiegelt (`run`↔`Invoke-KRun`, `ok`↔`Write-KOk`, `die`↔`Write-KFail`, `needs_reboot`↔`Request-KReboot`, `backup_file`↔`Backup-KFile`, `state_*`↔`*-KState`).
 - PSScriptAnalyzer prüft mit `tests/PSScriptAnalyzerSettings.psd1` auch Kompatibilität mit PS 5.1 und 7 (Syntax, Cmdlets, Parameter, Typen). Externe Programme nicht direkt per Name aufrufen, sondern über `Invoke-KRun`/`Invoke-KProbe` oder eine Variable – sonst Fehlalarm.
 - `tests/lint.sh` nutzt lokales `pwsh`, sonst Docker (`mcr.microsoft.com/powershell`), sonst Warnung; prüft auch den BOM. PS-Dry-Runs lassen sich im selben Container testen (`pwsh ./bootstrap.ps1 -DryRun -NonInteractive`) – der OS-Guard lässt Nicht-Windows nur im Dry-Run zu.
+- **`bootstrap.ps1` ist reines ASCII ohne BOM** (`irm | iex` bricht am BOM-Zeichen U+FEFF). Alle Texte mit Umlauten/Symbolen gehören in `lib/common.ps1` (`Invoke-KBootstrap`); `tests/lint.sh` erzwingt das. Alle anderen `.ps1` brauchen das BOM.
 - PS-Steps werden dot-gesourct: `exit` dort beendet nur den Step. Abbrüche immer über `Write-KFail` / `Request-KReboot` (werfen `KickoffExitException`, bootstrap.ps1 übersetzt in Exit-Code).
 - Fehlermeldungen nennen Schritt, Befehl und nächsten Handgriff.
 - Paketnamen (winget/brew/npm) nie raten, sondern prüfen (`winget search`, `brew search`, `npm view`).

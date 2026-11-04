@@ -48,9 +48,16 @@ else
   echo "⚠ PSScriptAnalyzer übersprungen: weder pwsh noch Docker verfügbar (wird in CI geprüft; lokal: brew install powershell)"
 fi
 
-# PowerShell 5.1 liest .ps1 ohne BOM als ANSI – BOM ist Pflicht.
+# PowerShell 5.1 liest .ps1 ohne BOM als ANSI – BOM ist Pflicht. Ausnahme bootstrap.ps1: `irm | iex`
+# bricht am BOM, deshalb muss diese Datei reines ASCII ohne BOM sein.
 for f in ${ps_files[@]+"${ps_files[@]}"}; do
-  if [ "$(head -c3 "$f" | od -An -tx1 | tr -d ' \n')" != "efbbbf" ]; then
+  bom="$(head -c3 "$f" | od -An -tx1 | tr -d ' \n')"
+  if [ "$f" = "bootstrap.ps1" ]; then
+    if [ "$bom" = "efbbbf" ] || LC_ALL=C grep -q '[^ -~	]' "$f"; then
+      echo "✘ $f: muss reines ASCII ohne BOM sein (irm | iex)" >&2
+      rc=1
+    fi
+  elif [ "$bom" != "efbbbf" ]; then
     echo "✘ $f: UTF-8-BOM fehlt" >&2
     rc=1
   fi

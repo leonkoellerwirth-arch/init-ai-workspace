@@ -466,6 +466,103 @@ function Test-KPlatform {
     return $allOk
 }
 
+# ---------------------------------------------------------------------------
+# Ablauf von bootstrap.ps1
+# ---------------------------------------------------------------------------
+# bootstrap.ps1 muss reines ASCII ohne BOM sein (sonst bricht `irm | iex` am BOM-Zeichen U+FEFF);
+# alle Texte mit Umlauten/Symbolen leben deshalb hier. Exit-Code landet in $script:KickoffExitCode.
+function Test-KStepMatch {
+    param([string]$Name, [string[]]$Pattern)
+    foreach ($p in $Pattern) {
+        $p = $p -replace '\.ps1$', ''
+        if ($p -eq $Name -or $p -eq ($Name -split '-', 2)[0]) { return $true }
+    }
+    return $false
+}
+
+function Invoke-KDoctor {
+    $doctorPath = Join-Path $KickoffRoot 'doctor.ps1'
+    if (-not (Test-Path $doctorPath)) {
+        Write-KWarn 'doctor ist noch nicht implementiert.'
+        return 0
+    }
+    & $doctorPath | Out-Host
+    return $LASTEXITCODE
+}
+
+function Invoke-KBootstrap {
+    param([string[]]$Only = @(), [string[]]$Skip = @(), [switch]$DoctorOnly)
+    # -File übergibt "-Only 10,30" als einen String – hier wieder aufteilen.
+    $Only = @($Only | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
+    $Skip = @($Skip | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
+    $retry = 'Log prüfen, Ursache beheben und denselben Befehl erneut starten – fertige Schritte werden übersprungen.'
+    $script:KickoffExitCode = 0
+
+    Initialize-KDirectory
+    if ($DoctorOnly) { $script:KickoffExitCode = Invoke-KDoctor; return }
+
+    try {
+        if ($env:OS -ne 'Windows_NT' -and -not (Test-KDryRun)) {
+            Write-KFail 'bootstrap.ps1 unterstützt in v1 nur Windows 11.' 'Unter macOS bootstrap.sh verwenden.'
+        }
+
+        Write-KInfo "kickoff – Log: $($env:KICKOFF_LOG)"
+        if (Test-KDryRun) { Write-KInfo 'Dry-Run: es wird nichts verändert.' }
+
+        Write-KConsole ''
+        Write-KConsole '── Vorabprüfung'
+        if (-not (Test-KPlatform)) {
+            if ($env:OS -eq 'Windows_NT' -or -not (Test-KDryRun)) {
+                Write-KFail 'Die Vorabprüfung ist fehlgeschlagen – es wurde nichts verändert.' 'Die Hinweise oben (→) befolgen und denselben Befehl erneut starten.'
+            }
+        }
+
+        $totalStart = Get-Date
+        $stepDir = Join-Path $KickoffRoot 'steps'
+        $stepFiles = @(Get-ChildItem -Path $stepDir -Filter '*.ps1' -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -match '^\d\d-' } | Sort-Object Name)
+        if ($stepFiles.Count -eq 0) { Write-KWarn "Keine Schritte gefunden in $stepDir." }
+
+        foreach ($stepFile in $stepFiles) {
+            $name = $stepFile.BaseName
+            if ($Only.Count -gt 0 -and -not (Test-KStepMatch $name $Only)) { continue }
+            if ($Skip.Count -gt 0 -and (Test-KStepMatch $name $Skip)) { continue }
+
+            Enter-KStep $name
+            . $stepFile.FullName
+            Exit-KStep
+        }
+
+        $script:KickoffStep = 'doctor'
+        $doctorRc = 0
+        if (Test-KDryRun) {
+            Write-KInfo '[dry-run] doctor wird nach einem echten Lauf ausgeführt.'
+        } else {
+            $doctorRc = Invoke-KDoctor
+            # Ein Teillauf (-Only/-Skip) kann nicht komplett grün sein – doctor ist dann nur Information.
+            if ($Only.Count -gt 0 -or $Skip.Count -gt 0) { $doctorRc = 0 }
+        }
+
+        Write-KTiming ([int]((Get-Date) - $totalStart).TotalSeconds)
+        $script:KickoffExitCode = $doctorRc
+    } catch [KickoffExitException] {
+        $script:KickoffExitCode = $_.Exception.ExitCode
+    } catch [KickoffCommandException] {
+        $ex = $_.Exception
+        Write-KLogFile "FAIL  exit=$($ex.ExitCode) cmd=$($ex.Command)"
+        Write-KConsole "✘ [$($script:KickoffStep)] $($ex.Message)" -ToError
+        Write-KConsole "  Nächster Schritt: $retry" -ToError
+        Write-KConsole "  Log: $($env:KICKOFF_LOG)" -ToError
+        $script:KickoffExitCode = 1
+    } catch {
+        Write-KLogFile "FAIL  $($_.Exception.Message) @ $($_.InvocationInfo.PositionMessage)"
+        Write-KConsole "✘ [$($script:KickoffStep)] $($_.Exception.Message)" -ToError
+        Write-KConsole "  Nächster Schritt: $retry" -ToError
+        Write-KConsole "  Log: $($env:KICKOFF_LOG)" -ToError
+        $script:KickoffExitCode = 1
+    }
+}
+
 # KickoffCommandException: Fehler eines über Invoke-KRun gestarteten Befehls (Befehl + Exit-Code).
 # KickoffExitException: gewollter Abbruch (Meldung ist schon ausgegeben) mit Exit-Code.
 if (-not ('KickoffExitException' -as [type])) {
