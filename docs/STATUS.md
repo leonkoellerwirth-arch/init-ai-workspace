@@ -9,14 +9,13 @@ Stand: 2026-11-04. Alle Phasen 0–5 der Spec sind umgesetzt, gepusht, CI grün 
 - Echte Installation git/gh/mise/node in CI (macOS), zweiter Lauf ohne Änderung, 2 s.
 - Steps 30/40/60 echt in isoliertem HOME (macOS) bzw. Container (pwsh).
 - Pipe-Einstieg `curl | bash` und `irm | iex` gegen GitHub.
+- **Ende-zu-Ende auf frischem macOS 26.6.2 (Tart-VM, echter `curl | bash`):** alle Schritte laufen durch.
+  Lauf 1: 578 s (Homebrew + CLT 328 s). Lauf 2: keine Änderung in 10–40/60, 8 s ohne Docker-Wartezeit.
+  doctor grün bis auf docker (VM auf M2 ohne nested virtualization) und GitHub-Login/SSH (Logins
+  bei `--non-interactive` absichtlich übersprungen). Gefundener Bug (ssh-add ohne Agent) behoben.
 
 ## Offen
 
-1. **macOS-VM-Test** (`tests/vm/macos.sh`): Basis-Image lädt bzw. muss laden.
-   - Download wurde am 2026-11-04 angehalten und muss neu gestartet werden.
-   - Fertig, wenn `tart list` die VM `kickoff-base` zeigt. Neu starten, falls nötig:
-     `tart clone ghcr.io/cirruslabs/macos-tahoe-vanilla:26.6.2 kickoff-base` (~24 GB)
-   - Dann: `tests/vm/macos.sh` (Ergebnis in `vm-results/`). Auf M1/M2 ist die docker-Zeile erwartbar rot (keine nested virtualization).
-   - Tart 2.41.1 liegt in `~/Applications/tart.app` (Homebrew-Formel upstream defekt), Link `/opt/homebrew/bin/tart`.
+1. **macOS interaktiv**: Logins (Schritt 90) einmal von Hand in der VM durchspielen: `tart clone kickoff-base kickoff-run && tart run kickoff-run`, dort den README-Befehl ohne Flags.
 2. **Windows end-to-end** (WSL2-Neustart, Docker Desktop): braucht echten Windows-11-PC oder Cloud-VM mit nested virtualization – Entscheidung des Betreibers.
 3. **Entscheidungen des Betreibers** (siehe `docs/BACKLOG.md`): Commit-Trailer `noreply@anthropic.com` vs. Spec §11; VS-Code-Defaults; `claude auth login`; `RemoteSigned`.

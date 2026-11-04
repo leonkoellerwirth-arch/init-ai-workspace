@@ -34,7 +34,11 @@ step_50_docker() {
     waited=$((waited + 3))
     load_env_paths
   done
-  warn "Docker antwortet nach ${KICKOFF_DOCKER_TIMEOUT} s noch nicht. Beim ersten Start will Docker Desktop eine Bestätigung im Fenster – danach: ./bootstrap.sh --only 50"
+  if [ "$(sysctl -n kern.hv_vmm_present 2>/dev/null || echo 0)" = "1" ]; then
+    warn "Docker antwortet nach ${KICKOFF_DOCKER_TIMEOUT} s noch nicht. Dieser Mac ist eine VM – Docker Desktop braucht dort verschachtelte Virtualisierung (Apple M3+ als Host). Auf echter Hardware: ./bootstrap.sh --only 50"
+  else
+    warn "Docker antwortet nach ${KICKOFF_DOCKER_TIMEOUT} s noch nicht. Beim ersten Start will Docker Desktop eine Bestätigung im Fenster – danach: ./bootstrap.sh --only 50"
+  fi
 }
 
 step_50_docker
