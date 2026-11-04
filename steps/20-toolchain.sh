@@ -59,7 +59,7 @@ step_20_toolchain() {
   local tool version current
   while read -r tool version; do
     current=""
-    if has_cmd mise; then current="$(cd "$HOME" && mise current "$tool" 2>/dev/null || true)"; fi
+    if has_cmd mise; then current="$(cd "$HOME" || exit 0; mise current "$tool" 2>/dev/null || true)"; fi
     case "$current" in
       "$version" | "$version".*)
         ok "$tool $current (mise) bereits vorhanden" ;;

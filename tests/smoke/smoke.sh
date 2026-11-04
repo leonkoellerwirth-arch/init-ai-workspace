@@ -17,7 +17,7 @@ dry() {
   # Dry-Run darf außer dem Log nichts anlegen. Caches, die brew/npm/code beim Lesen selbst
   # anlegen, sind keine Änderung durch kickoff.
   local changed
-  changed="$(cd "$home" && find . -mindepth 1 -type f \
+  changed="$(cd "$home" || exit 0; find . -mindepth 1 -type f \
     -not -path './.kickoff/logs/*' \
     -not -path './Library/Caches/*' -not -path './.npm/*' -not -path './.cache/*' \
     -not -path './.vscode/*' -not -path './Library/Application Support/Code/*' \

@@ -66,7 +66,7 @@ v=""; has_cmd mise && v="$(ver_of mise --version)"
 if [ -n "$v" ]; then row "mise" "vorhanden" "$v" ok; else row "mise" "vorhanden" "" fail "brew install mise"; fi
 
 # node über mise
-v=""; has_cmd mise && v="$(cd "$HOME" && mise current node 2>/dev/null || true)"
+v=""; if has_cmd mise; then v="$(cd "$HOME" || exit 0; mise current node 2>/dev/null || true)"; fi
 case "$v" in
   "$NODE_MAJOR" | "$NODE_MAJOR".*) row "node (mise)" "$NODE_MAJOR.x" "$v" ok ;;
   *) row "node (mise)" "$NODE_MAJOR.x" "$v" fail "mise use -g node@$NODE_MAJOR" ;;
