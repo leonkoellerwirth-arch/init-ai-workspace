@@ -195,6 +195,10 @@ state_clear() { is_dry_run && return 0; rm -f "$KICKOFF_STATE_DIR/$1"; }
 
 # needs_reboot <marker> <Erklärung> – Neustart-Marker setzen, erklären, sauber beenden (Exit 3).
 needs_reboot() {
+  if is_dry_run; then
+    _say "  [dry-run] Neustart nötig (Marker reboot-$1): $2"
+    return 0
+  fi
   state_set "reboot-$1" "$KICKOFF_STEP"
   _log_file "REBOOT marker=$1"
   _say ""
@@ -281,27 +285,6 @@ _ensure_block_write() {
   rm -f "$tmp"
 }
 
-# JSON-Merge per node (identisch in lib/common.ps1): fehlende Keys aus <defaults> in <target>
-# ergänzen, bestehende Keys gewinnen. Exit 0 = nichts zu tun, 10 = geändert (bzw. würde ändern),
-# 20 = Ziel ist kein reines JSON (z. B. Kommentare) – dann nichts anfassen.
-KICKOFF_JSON_MERGE_JS='
-const fs = require("fs");
-const [target, defaults, mode] = process.argv.slice(1);
-const want = JSON.parse(fs.readFileSync(defaults, "utf8"));
-let have = {};
-if (fs.existsSync(target)) {
-  const raw = fs.readFileSync(target, "utf8").replace(/^\uFEFF/, "");
-  if (raw.trim() !== "") {
-    try { have = JSON.parse(raw); } catch (e) { process.exit(20); }
-  }
-}
-const missing = Object.keys(want).filter(k => !(k in have));
-if (missing.length === 0) process.exit(0);
-if (mode === "write") {
-  for (const k of missing) have[k] = want[k];
-  fs.writeFileSync(target, JSON.stringify(have, null, 2) + "\n");
-}
-console.log(missing.join(", "));
-process.exit(10);
-'
-json_merge() { node -e "$KICKOFF_JSON_MERGE_JS" "$@"; }
+# JSON-Merge (lib/json-merge.js, identisch für Windows): Exit 0 = nichts zu tun, 10 = Keys fehlen
+# (bzw. wurden ergänzt), 20 = Ziel ist kein reines JSON.
+json_merge() { node "$KICKOFF_ROOT/lib/json-merge.js" "$@"; }

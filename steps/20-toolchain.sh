@@ -3,7 +3,8 @@
 # 20-toolchain – mise, Node aus manifests/mise.toml, globale npm-Pakete, Shell-Hooks.
 # Wird von bootstrap.sh dot-gesourct; nutzt lib/common.sh.
 
-KICKOFF_NPM_GLOBALS="@anthropic-ai/claude-code @openai/codex"
+# CI setzt KICKOFF_NPM_GLOBALS="" (echte Installationen dort nur für git, gh, mise, node).
+KICKOFF_NPM_GLOBALS="${KICKOFF_NPM_GLOBALS-@anthropic-ai/claude-code @openai/codex}"
 
 # Gibt "tool version" je Zeile aus dem [tools]-Abschnitt von mise.toml aus.
 _step20_tools() {

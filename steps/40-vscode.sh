@@ -53,7 +53,6 @@ step_40_vscode() {
     0)  ok "VS-Code-Settings bereits vorhanden" ;;
     10) doing "VS-Code-Settings werden ergänzt: $missing"
         backup_file "$KICKOFF_VSCODE_SETTINGS"
-        if ! is_dry_run; then mkdir -p "$(dirname "$KICKOFF_VSCODE_SETTINGS")"; fi
         run _step40_merge "$defaults" ;;
     20) warn "VS-Code-settings.json enthält Kommentare o. Ä. und wird nicht automatisch geändert. Fehlende Keys bitte aus $defaults übernehmen." ;;
     *)  die "Settings-Merge fehlgeschlagen (Exit $rc)." "node -v prüfen und erneut starten." ;;

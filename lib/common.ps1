@@ -30,6 +30,7 @@ if (-not $env:KICKOFF_NON_INTERACTIVE) { $env:KICKOFF_NON_INTERACTIVE = '0' }
 $script:KickoffStep = 'bootstrap'
 $script:KickoffStepStart = Get-Date
 $script:KickoffTiming = New-Object System.Collections.ArrayList
+$script:KickoffDryBackups = New-Object System.Collections.ArrayList
 
 function Initialize-KDirectory {
     foreach ($dir in @($script:KickoffLogDir, $script:KickoffStateDir)) {
@@ -45,6 +46,9 @@ function Hide-KSecret {
     param([Parameter(ValueFromPipeline = $true)][AllowEmptyString()][string]$Text)
     process {
         $t = $Text
+        $t = $t -replace 'git@github\.com', '__KICKOFF_GH__'
+        $t = $t -replace '[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}', '***@***'
+        $t = $t -replace '__KICKOFF_GH__', 'git@github.com'
         $t = $t -replace '(gh[pousr]_)[A-Za-z0-9_]{10,}', '$1***'
         $t = $t -replace '(github_pat_)[A-Za-z0-9_]{10,}', '$1***'
         $t = $t -replace '(sk-ant-)[A-Za-z0-9_-]{6,}', '$1***'
@@ -121,10 +125,10 @@ function Assert-KNativeCommand {
 
 # Invoke-KRun <cmd> [args…] – Ausgabe nur ins Log; Exit-Code != 0 wird zum Fehler.
 function Invoke-KRun {
-    param(
-        [Parameter(Mandatory = $true, Position = 0)][string]$Command,
-        [Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments = @()
-    )
+    # Bewusst $args statt param(): sonst würde PowerShell Argumente wie -o, -v oder -e als
+    # eigene Common Parameters deuten statt sie an das native Programm durchzureichen.
+    $Command = [string]$args[0]
+    $Arguments = @($args | Select-Object -Skip 1 | ForEach-Object { [string]$_ })
     $q = Format-KCommand $Command $Arguments
     Assert-KNativeCommand $Command
     if (Test-KDryRun) {
@@ -151,10 +155,10 @@ function Invoke-KRun {
 
 # Invoke-KRunVisible <cmd> [args…] – für Befehle, die das Terminal brauchen (Logins, Prompts).
 function Invoke-KRunVisible {
-    param(
-        [Parameter(Mandatory = $true, Position = 0)][string]$Command,
-        [Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments = @()
-    )
+    # Bewusst $args statt param(): sonst würde PowerShell Argumente wie -o, -v oder -e als
+    # eigene Common Parameters deuten statt sie an das native Programm durchzureichen.
+    $Command = [string]$args[0]
+    $Arguments = @($args | Select-Object -Skip 1 | ForEach-Object { [string]$_ })
     $q = Format-KCommand $Command $Arguments
     Assert-KNativeCommand $Command
     if (Test-KDryRun) {
@@ -201,7 +205,13 @@ function Backup-KFile {
         $rel = $full -replace '^[A-Za-z]:', '' -replace '^[\\/]+', ''
     }
     $dest = Join-Path $script:KickoffBackupDir $rel
-    if (Test-KDryRun) { Write-KConsole "  [dry-run] Backup $full → $dest"; return }
+    if (Test-KDryRun) {
+        if ($script:KickoffDryBackups -notcontains $full) {
+            [void]$script:KickoffDryBackups.Add($full)
+            Write-KConsole "  [dry-run] Backup $full → $dest"
+        }
+        return
+    }
     if (Test-Path $dest) { return }
     [void](New-Item -ItemType Directory -Path (Split-Path $dest -Parent) -Force)
     Copy-Item -Path $full -Destination $dest
@@ -234,6 +244,10 @@ function Clear-KState {
 # Request-KReboot <marker> <Erklärung> – Neustart-Marker setzen, erklären, sauber beenden (Exit 3).
 function Request-KReboot {
     param([string]$Marker, [string]$Reason)
+    if (Test-KDryRun) {
+        Write-KConsole "  [dry-run] Neustart nötig (Marker reboot-$Marker): $Reason"
+        return
+    }
     Save-KState "reboot-$Marker" $script:KickoffStep
     Write-KLogFile "REBOOT marker=$Marker"
     Write-KConsole ''
@@ -269,6 +283,119 @@ function Write-KTiming {
     }
     Write-KConsole ('  {0,-20} {1,4}s' -f 'gesamt', $Total)
     Write-KLogFile "TOTAL ${Total}s"
+}
+
+# ---------------------------------------------------------------------------
+# Umgebung, Profile, JSON, Rechte
+# ---------------------------------------------------------------------------
+# PATH aus Registry (Machine + User) neu laden und mise-Shims voranstellen – nach winget-Installationen
+# kennt der laufende Prozess die neuen Pfade sonst nicht (Spiegel von load_env_paths).
+function Import-KEnvPath {
+    if ($env:OS -ne 'Windows_NT') { return }
+    $machine = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+    $user = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $parts = @()
+    $shims = Join-Path $env:LOCALAPPDATA 'mise\shims'
+    if (Test-Path $shims) { $parts += $shims }
+    foreach ($p in (@($machine, $user, $env:Path) -join ';').Split(';')) {
+        if ($p -and ($parts -notcontains $p)) { $parts += $p }
+    }
+    $env:Path = $parts -join ';'
+}
+
+# Sync-KBlock <Datei> <Name> <Inhalt> – verwalteter Block zwischen Markern; Rest der Datei bleibt.
+function Sync-KBlock {
+    param([string]$Path, [string]$Name, [string]$Content, [switch]$NoBom)
+    $begin = "# >>> kickoff:$Name >>>"
+    $end = "# <<< kickoff:$Name <<<"
+    $wanted = @($begin) + ($Content -split "`r?`n") + @($end)
+    $lines = @()
+    if (Test-Path $Path) { $lines = @(Get-Content -Path $Path -Encoding UTF8) }
+    $current = @(); $outside = @(); $inBlock = $false
+    foreach ($l in $lines) {
+        if ($l -eq $begin) { $inBlock = $true }
+        if ($inBlock) { $current += $l } else { $outside += $l }
+        if ($l -eq $end) { $inBlock = $false }
+    }
+    $label = Split-Path $Path -Leaf
+    if (($current -join "`n") -eq ($wanted -join "`n")) {
+        Write-KOk "${label}: Block $Name bereits vorhanden"
+        return
+    }
+    Write-KDoing "${label}: Block $Name wird eingetragen"
+    Backup-KFile $Path
+    if (Test-KDryRun) {
+        Write-KConsole "  [dry-run] Block $Name in $Path schreiben"
+        return
+    }
+    $dir = Split-Path $Path -Parent
+    if (-not (Test-Path $dir)) { [void](New-Item -ItemType Directory -Path $dir -Force) }
+    $text = (@($outside) + @('') + $wanted) -join "`r`n"
+    # Standard: UTF-8 mit BOM, damit Windows PowerShell 5.1 Profile korrekt liest. -NoBom z. B. für ~/.ssh/config.
+    [IO.File]::WriteAllText($Path, $text + "`r`n", (New-Object System.Text.UTF8Encoding(-not $NoBom)))
+    Write-KLogFile "BLOCK $Name → $Path"
+}
+
+# Invoke-KJsonMerge <target> <defaults> <check|write> – Exit-Codes wie lib/json-merge.js.
+function Invoke-KJsonMerge {
+    param([string]$Target, [string]$Defaults, [string]$Mode)
+    $script = Join-Path $PSScriptRoot 'json-merge.js'
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $out = & node $script $Target $Defaults $Mode 2>&1 | ForEach-Object { "$_" }
+        $rc = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+    return [pscustomobject]@{ ExitCode = $rc; Missing = ($out -join ' ') }
+}
+
+# Invoke-KProbe <cmd> [args…] – nativen Befehl nur lesend prüfen (auch im Dry-Run); Exit-Code + Ausgabe.
+function Invoke-KProbe {
+    # Bewusst $args statt param(): sonst würde PowerShell Argumente wie -o, -v oder -e als
+    # eigene Common Parameters deuten statt sie an das native Programm durchzureichen.
+    $Command = [string]$args[0]
+    $Arguments = @($args | Select-Object -Skip 1 | ForEach-Object { [string]$_ })
+    if (-not (Test-KCommand $Command)) { return [pscustomobject]@{ ExitCode = 127; Output = '' } }
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $out = & $Command @Arguments 2>&1 | ForEach-Object { "$_" }
+        $rc = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+    if ($null -eq $rc) { $rc = 0 }
+    return [pscustomobject]@{ ExitCode = $rc; Output = (@($out) -join "`n") }
+}
+
+function Test-KAdmin {
+    if ($env:OS -ne 'Windows_NT') { return $false }
+    $id = [Security.Principal.WindowsIdentity]::GetCurrent()
+    return (New-Object Security.Principal.WindowsPrincipal($id)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+# Invoke-KElevated <exe> <argumente> – einzelner Befehl mit UAC-Abfrage (nur dieser Schritt, nicht pauschal).
+function Invoke-KElevated {
+    param([string]$FilePath, [string[]]$ArgumentList = @())
+    $q = Format-KCommand $FilePath $ArgumentList
+    if (Test-KDryRun) {
+        Write-KLogFile "PLAN  (admin) $q"
+        Write-KConsole "  [dry-run] (admin) $q"
+        return
+    }
+    Write-KLogFile "RUN   (admin) $q"
+    if (Test-KAdmin) {
+        $p = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -Wait -PassThru -NoNewWindow
+    } else {
+        Write-KInfo 'Windows fragt gleich nach Administratorrechten (UAC).'
+        $p = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -Verb RunAs -Wait -PassThru
+    }
+    if ($p.ExitCode -ne 0) {
+        Write-KLogFile "EXIT  $($p.ExitCode)"
+        throw (New-Object KickoffCommandException($q, $p.ExitCode))
+    }
 }
 
 # KickoffCommandException: Fehler eines über Invoke-KRun gestarteten Befehls (Befehl + Exit-Code).
