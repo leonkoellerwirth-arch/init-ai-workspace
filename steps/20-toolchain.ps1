@@ -87,7 +87,13 @@ if (Test-Path $kickoffProfile) { . $kickoffProfile }
     # CI setzt KICKOFF_NPM_GLOBALS="" (echte Installationen dort nur für git, gh, mise, node).
     $globals = '@anthropic-ai/claude-code @openai/codex'
     if ($null -ne $env:KICKOFF_NPM_GLOBALS) { $globals = $env:KICKOFF_NPM_GLOBALS }
+    $bins = @{ '@anthropic-ai/claude-code' = 'claude'; '@openai/codex' = 'codex' }
     foreach ($pkg in ($globals -split '\s+' | Where-Object { $_ })) {
+        # Ist der Befehl schon da (z. B. über einen anderen Installer), nicht doppelt installieren.
+        if ($bins.ContainsKey($pkg) -and (Test-KCommand $bins[$pkg])) {
+            Write-KOk "$pkg bereits vorhanden ($($bins[$pkg]))"
+            continue
+        }
         if ((Invoke-KProbe npm ls -g --depth=0 $pkg).ExitCode -eq 0) {
             Write-KOk "$pkg bereits vorhanden"
             continue

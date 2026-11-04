@@ -18,6 +18,14 @@ _step20_tools() {
     }' "$KICKOFF_ROOT/manifests/mise.toml"
 }
 
+# Befehl, den ein npm-Paket bereitstellt.
+_step20_bin() {
+  case "$1" in
+    @anthropic-ai/claude-code) echo claude ;;
+    @openai/codex) echo codex ;;
+  esac
+}
+
 step_20_toolchain() {
   load_env_paths
   if has_cmd mise; then
@@ -64,7 +72,14 @@ step_20_toolchain() {
 
   # Globale npm-Pakete. Paketname wird vorher geprüft – nie raten (Spec §5).
   local pkg
+  local bin
   for pkg in $KICKOFF_NPM_GLOBALS; do
+    # Ist der Befehl schon da (z. B. über einen anderen Installer), nicht doppelt installieren.
+    bin="$(_step20_bin "$pkg")"
+    if [ -n "$bin" ] && has_cmd "$bin"; then
+      ok "$pkg bereits vorhanden ($bin)"
+      continue
+    fi
     if has_cmd npm && npm ls -g --depth=0 "$pkg" >/dev/null 2>&1; then
       ok "$pkg bereits vorhanden"
       continue
