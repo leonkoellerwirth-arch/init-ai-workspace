@@ -12,14 +12,14 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: shellcheck + PSScriptAnalyzer
         run: tests/lint.sh
 
   macos-dry-run:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Dry-Run
         run: ./bootstrap.sh --dry-run --non-interactive
       - name: Smoke-Tests
@@ -41,7 +41,7 @@ jobs:
   windows-dry-run:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Dry-Run (Windows PowerShell 5.1)
         shell: powershell
         run: .\bootstrap.ps1 -DryRun -NonInteractive
