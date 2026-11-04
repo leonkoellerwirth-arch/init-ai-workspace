@@ -8,10 +8,10 @@ Ideen außerhalb der Spec. Nicht bauen, nur notieren.
 
 ## Entscheidungen, wo die Spec offen war
 
-- VS-Code-Settings (`config/vscode/settings.json`): drei neutrale Defaults; Inhalt nicht in der Spec.
+- VS-Code-Settings (`config/vscode/settings.json`): drei neutrale Defaults; Inhalt nicht in der Spec. Vom Betreiber bestätigt (2026-11-05).
 - WSL2: Paket `Microsoft.WSL` in `windows.dsc.yaml`, Aktivierung + Neustart-Marker in Schritt 50 (§5 Docker).
-- Claude-Login über `claude auth login` statt „claude einmal starten" – gleicher Browser-Login, prüfbar über `claude auth status`.
+- Claude-Login über `claude auth login` statt „claude einmal starten" – gleicher Browser-Login, prüfbar über `claude auth status`. Vom Betreiber bestätigt (2026-11-05).
 - Teilläufe (`--only`/`--skip`) enden nicht mit doctors Exit-Code, sonst wäre jeder Teillauf rot.
 - `lib/json-merge.js` zusätzlich zur Struktur in §3, damit beide Plattformen identisch mergen.
-- Windows: ExecutionPolicy `RemoteSigned` (CurrentUser) und `core.sshCommand` auf Windows-OpenSSH – sonst laden Profil/npm-Shims nicht bzw. sieht Git den ssh-agent nicht.
+- Windows: ExecutionPolicy `RemoteSigned` (CurrentUser) und `core.sshCommand` auf Windows-OpenSSH – sonst laden Profil/npm-Shims nicht bzw. sieht Git den ssh-agent nicht. `RemoteSigned` vom Betreiber bestätigt (2026-11-05).
 - README länger als eine Bildschirmseite (Spec §7): Betreiber wollte ausdrücklich sehen, was auf dem Rechner geändert wird und wozu (2026-11-04).

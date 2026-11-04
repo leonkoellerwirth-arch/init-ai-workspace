@@ -21,4 +21,3 @@ Stand: 2026-11-04. Alle Phasen 0–5 der Spec sind umgesetzt, gepusht, CI grün 
 
 1. **macOS interaktiv**: Logins (Schritt 90) einmal von Hand in der VM durchspielen: `tart clone kickoff-base kickoff-run && tart run kickoff-run`, dort den README-Befehl ohne Flags.
 2. **Windows-Volllauf** (Schritt 10 `winget configure`, 50 WSL2-Neustart/Docker Desktop, 90 Logins): braucht echten Windows-11-PC oder Cloud-VM mit nested virtualization (Weg B/C) – Entscheidung des Betreibers.
-3. **Entscheidungen des Betreibers** (siehe `docs/BACKLOG.md`): Commit-Trailer `noreply@anthropic.com` vs. Spec §11; VS-Code-Defaults; `claude auth login`; `RemoteSigned`.
